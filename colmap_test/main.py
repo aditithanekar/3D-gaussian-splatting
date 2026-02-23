@@ -22,8 +22,11 @@ def render_multiple_gaussians(gaussians, camera, image_width, image_height):
         if pixel is None:
             continue # just leave it out of the computation bc it could be behind the camera
         pixel_x, pixel_y = pixel
+        
         print(f"Pixel is: {pixel_x:.2f}, {pixel_y:.2f}")
         covariance_camera_sigma_prime = gaussian.project_covariance_to_camera_coords(camera)
+        # print("covariance is" )
+        # print(covariance_camera_sigma_prime)
         print("splatting gaussian")
     
         cov_inv = np.linalg.inv(covariance_camera_sigma_prime)
@@ -42,18 +45,12 @@ def render_multiple_gaussians(gaussians, camera, image_width, image_height):
         if x_min > x_max or y_min > y_max:
             continue  # completely outside screen
         
-        # Optional: skip very tiny Gaussians
-        # if (x_max - x_min) * (y_max - y_min) < 4:
-        #     continue
-        
         #iterate through the 2d pixel grid (this is kinda inefficient so we should use bounding box)
         for y in range(y_min, y_max + 1):
             for x in range(x_min, x_max + 1):
                 #splat
                 offset = np.array([x - pixel_x, y - pixel_y]) # how much is the gaussian 2d pixel offset from each pixel
-                gaussian_weight_at_point = math.exp(-0.5 * ((offset).T @ cov_inv @ offset))
-                #!!!!!this will need to be fixed later to have proper alpha blending
-                
+                gaussian_weight_at_point = math.exp(-0.5 * ((offset).T @ cov_inv @ offset))                
                 alpha = gaussian.alpha * gaussian_weight_at_point
                 
                 # alpha blending:
@@ -111,7 +108,6 @@ def main():
             opacity=0.8
         )]
     
-
     image = render_multiple_gaussians(gaussians, cam1, image_width=image_width, image_height=image_height )        
     print("showing plot")     
 
