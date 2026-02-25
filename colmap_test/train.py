@@ -32,6 +32,10 @@ class GaussianModel(nn.Module):
         self.rotations = nn.Parameter(torch.from_numpy(rotations).float())
         self.colors = nn.Parameter(torch.from_numpy(colors).float())
         self.opacities = nn.Parameter(torch.from_numpy(opacities).float())
+
+        # clamp initial scales to prevent exploding bounding boxes
+        with torch.no_grad():
+            self.scales.clamp_(-3, 3)
         
         print(f"Initialized model with {N} Gaussians")
         print(f"Total parameters: {sum(p.numel() for p in self.parameters())}")
@@ -132,6 +136,7 @@ def train_simple(model, cameras_data, num_iterations=50, lr=0.001):
 
 # more minimal version first to ensure it's working. later todos: densification, and more
 def train_gaussians(model, cameras_data, num_iterations=10, lr=0.002):
+    torch.autograd.set_detect_anomaly(True)
     import psutil, gc
     optimizer = optim.Adam(model.parameters(), lr=lr)
     losses = []
@@ -152,7 +157,7 @@ def train_gaussians(model, cameras_data, num_iterations=10, lr=0.002):
         optimizer.zero_grad()
         
         cam = cameras_data[np.random.randint(len(cameras_data))]
-        gt = torch.from_numpy(cam['target_image']).float().permute(2, 0, 1)  # (3,H,W)
+        gt = torch.from_numpy(cam['target_image']).float().permute(2, 0, 1).to(device)  # (3,H,W)
         
         pos, sca, rot, col, opa = model.get_gaussian_tensors()
         rendered = render_differentiable(pos, sca, rot, col, opa, cam['camera'], gt.shape[2], gt.shape[1], device)

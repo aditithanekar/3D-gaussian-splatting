@@ -127,7 +127,8 @@ def render_differentiable(
     Sigma = rot_matrix @ scale_matrix @ scale_matrix.transpose(-1,-2) @ rot_matrix.transpose(-1, -2)
     
     covariance_camera = Jacobian @ W @ Sigma @ W.transpose(-1,-2) @ Jacobian.transpose(-1,-2)
-    
+    contributions = []  # collect (slice_y, slice_x, weighted_contrib) tuples
+
     #bounding box loop
     for i in range(len(pixel_x)):
         px = pixel_x[i].item()
@@ -149,7 +150,7 @@ def render_differentiable(
         sigma_y = torch.sqrt(cov_2d[1, 1])
         #clamp radius
         radius = min(max(sigma_x, sigma_y) * 3.5, 64)
-        print(f"Gaussian {i}: px=({px:.1f},{py:.1f}), radius={radius:.1f}, bbox=({x_min},{y_min})-({x_max},{y_max}), bbox_size={( x_max-x_min+1)*(y_max-y_min+1)}", flush=True)
+        # print(f"Gaussian {i}: px=({px:.1f},{py:.1f}), radius={radius:.1f}, bbox=({x_min},{y_min})-({x_max},{y_max}), bbox_size={( x_max-x_min+1)*(y_max-y_min+1)}", flush=True)
 
 
         x_min = max(0, int(px - radius))
@@ -176,10 +177,30 @@ def render_differentiable(
         
         slice_y = slice(y_min, y_max + 1)
         slice_x = slice(x_min, x_max + 1)
-        contrib = colors[i] * alpha[..., None]       # broadcasts to (h',w',3)
+        #contrib = colors[i] * alpha[..., None]       # broadcasts to (h',w',3)
 
-        image[slice_y, slice_x] += transmittance[slice_y, slice_x][..., None] * contrib
-        transmittance[slice_y, slice_x] *= (1.0 - alpha)
-        
+        # image[slice_y, slice_x] += transmittance[slice_y, slice_x][..., None] * contrib
+        # transmittance[slice_y, slice_x] *= (1.0 - alpha)
+        # image = image.clone()
+        # image[slice_y, slice_x] = image[slice_y, slice_x] + transmittance[slice_y, slice_x][..., None] * contrib
+        # transmittance = transmittance.clone()
+        # transmittance[slice_y, slice_x] = transmittance[slice_y, slice_x] * (1.0 - alpha)
+        # use detached transmittance — no gradient through transmittance
+        with torch.no_grad():
+            t_slice = transmittance[y_min:y_max+1, x_min:x_max+1].clone()
+            transmittance[y_min:y_max+1, x_min:x_max+1] = t_slice * (1.0 - alpha.detach())
+
+        contrib = t_slice[..., None] * colors[i] * alpha[..., None]  # (h', w', 3)
+        contributions.append((y_min, y_max, x_min, x_max, contrib))
+    # build final image out-of-place by summing all contributions
+    for (y_min, y_max, x_min, x_max, contrib) in contributions:
+      image = image + torch.nn.functional.pad(
+        contrib,
+        (0, 0,                        # color dim
+        x_min, width - x_max - 1,    # left, right
+        y_min, height - y_max - 1),  # top, bottom
+        value=0)
+
+
     return image.permute(2, 0, 1).clamp(0, 1) 
     
