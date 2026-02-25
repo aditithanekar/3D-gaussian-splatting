@@ -132,17 +132,30 @@ def train_simple(model, cameras_data, num_iterations=50, lr=0.001):
 
 # more minimal version first to ensure it's working. later todos: densification, and more
 def train_gaussians(model, cameras_data, num_iterations=10, lr=0.002):
+    import psutil, gc
     optimizer = optim.Adam(model.parameters(), lr=lr)
     losses = []
-    
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
     for i in range(1, num_iterations + 1):
+        # printing and RAM check for memory
+        print(f"\n--- Iter {i}/{num_iterations} ---", flush=True)
+    
+        mem = psutil.virtual_memory()
+        print(f"RAM: {mem.used/1e9:.1f}GB / {mem.total/1e9:.1f}GB", flush=True)
+        if torch.cuda.is_available():
+            print(f"VRAM: {torch.cuda.memory_allocated()/1e9:.2f}GB allocated", flush=True)
+            torch.cuda.empty_cache()
+        #manual garbage collection
+        gc.collect()
+        #training code
         optimizer.zero_grad()
         
         cam = cameras_data[np.random.randint(len(cameras_data))]
         gt = torch.from_numpy(cam['target_image']).float().permute(2, 0, 1)  # (3,H,W)
         
         pos, sca, rot, col, opa = model.get_gaussian_tensors()
-        rendered = render_differentiable(pos, sca, rot, col, opa, cam['camera'], gt.shape[2], gt.shape[1])
+        rendered = render_differentiable(pos, sca, rot, col, opa, cam['camera'], gt.shape[2], gt.shape[1], device)
         
         loss = torch.mean(torch.abs(rendered - gt))
         loss.backward()
@@ -189,7 +202,8 @@ with torch.no_grad():
     render_w = int(w * render_size_factor)
     
     pos, sca, rot, col, opa = model.get_gaussian_tensors()
-    rendered = render_differentiable(pos, sca, rot, col, opa, camera, render_w, render_h)
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    rendered = render_differentiable(pos, sca, rot, col, opa, camera, render_w, render_h, device)
     rendered_np = rendered.detach().cpu().permute(1, 2, 0).clamp(0,1).numpy()
     
     # show side by side
