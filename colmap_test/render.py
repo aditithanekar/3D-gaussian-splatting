@@ -147,7 +147,10 @@ def render_differentiable(
         # axis-aligned bounding box
         sigma_x = torch.sqrt(cov_2d[0, 0])
         sigma_y = torch.sqrt(cov_2d[1, 1])
-        radius = max(sigma_x, sigma_y) * 3.5
+        #clamp radius
+        radius = min(max(sigma_x, sigma_y) * 3.5, 64)
+        print(f"Gaussian {i}: px=({px:.1f},{py:.1f}), radius={radius:.1f}, bbox=({x_min},{y_min})-({x_max},{y_max}), bbox_size={( x_max-x_min+1)*(y_max-y_min+1)}", flush=True)
+
 
         x_min = max(0, int(px - radius))
         x_max = min(width - 1, int(px + radius + 0.999))
