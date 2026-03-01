@@ -57,10 +57,11 @@ def load_cameras_from_colmap(reconstruction, images_path="images"):
         img_path = f"{images_path}/{colmap_image.name}"
         target_img = np.array(Image.open(img_path)).astype(np.float32) / 255.0
         
+        camera_center = -R.T @ t  # actual camera position in world space
         # Create Camera object
         cam = Camera(
             R=R,
-            T=t,
+            T=camera_center, #changed this
             FoVx=FoVx,
             FoVy=FoVy,
             image_width=width,
@@ -74,6 +75,12 @@ def load_cameras_from_colmap(reconstruction, images_path="images"):
         })
     
     print(f"Loaded {len(cameras_data)} cameras with target images")
+    for i, cam_data in enumerate(cameras_data):
+        cam = cam_data['camera']
+        R = np.array(cam.R)
+        T = np.array(cam.T)  # now these are actual world positions
+        forward = R[2, :]
+    print(f"Cam {i}: center={np.round(T, 2)}, forward={np.round(forward, 2)}")
     return cameras_data
 
 
@@ -125,8 +132,8 @@ def test_initial_render(gaussians, cameras_data):
     print("Visualization saved as 'initial_render.png'")
 
 # # Test it:
-# gaussians, recon = test_initialization()
-# cameras_data = load_cameras_from_colmap(recon)
+gaussians, recon = test_initialization()
+cameras_data = load_cameras_from_colmap(recon)
 
 # # Run the test
-# test_initial_render(gaussians, cameras_data)
+test_initial_render(gaussians, cameras_data)
