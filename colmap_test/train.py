@@ -36,6 +36,7 @@ class GaussianModel(nn.Module):
         # clamp initial scales to prevent exploding bounding boxes
         with torch.no_grad():
             self.scales.clamp_(-3, 3)
+            self.scales.fill_(1.0)  # exp(1) ≈ 2.7 world units, much more visible
         
         print(f"Initialized model with {N} Gaussians")
         print(f"Total parameters: {sum(p.numel() for p in self.parameters())}")
