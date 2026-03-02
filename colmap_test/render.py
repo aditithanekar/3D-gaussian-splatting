@@ -127,8 +127,7 @@ def render_differentiable(
     Sigma = rot_matrix @ scale_matrix @ scale_matrix.transpose(-1,-2) @ rot_matrix.transpose(-1, -2)
     
     covariance_camera = Jacobian @ W @ Sigma @ W.transpose(-1,-2) @ Jacobian.transpose(-1,-2)
-    contributions = []  # collect (slice_y, slice_x, weighted_contrib) tuples
-
+    
     #bounding box loop
     for i in range(len(pixel_x)):
         px = pixel_x[i].item()
@@ -188,18 +187,25 @@ def render_differentiable(
         # use detached transmittance — no gradient through transmittance
         with torch.no_grad():
             t_slice = transmittance[y_min:y_max+1, x_min:x_max+1].clone()
-            transmittance[y_min:y_max+1, x_min:x_max+1] = t_slice * (1.0 - alpha.detach())
+            # transmittance[y_min:y_max+1, x_min:x_max+1] = t_slice * (1.0 - alpha.detach())
 
         contrib = t_slice[..., None] * colors[i] * alpha[..., None]  # (h', w', 3)
-        contributions.append((y_min, y_max, x_min, x_max, contrib))
-    # build final image out-of-place by summing all contributions
-    for (y_min, y_max, x_min, x_max, contrib) in contributions:
-      image = image + torch.nn.functional.pad(
-        contrib,
-        (0, 0,                        # color dim
-        x_min, width - x_max - 1,    # left, right
-        y_min, height - y_max - 1),  # top, bottom
-        value=0)
+        # contributions.append((y_min, y_max, x_min, x_max, contrib))
+        
+        # Update image and transmittance immediately, in order
+        image[y_min:y_max+1, x_min:x_max+1] = \
+            image[y_min:y_max+1, x_min:x_max+1] + contrib
+        with torch.no_grad():
+            transmittance[y_min:y_max+1, x_min:x_max+1] = \
+                t_slice * (1.0 - alpha.detach())
+    # # build final image out-of-place by summing all contributions
+    # for (y_min, y_max, x_min, x_max, contrib) in contributions:
+    #   image = image + torch.nn.functional.pad(
+    #     contrib,
+    #     (0, 0,                        # color dim
+    #     x_min, width - x_max - 1,    # left, right
+    #     y_min, height - y_max - 1),  # top, bottom
+    #     value=0)
 
 
     return image.permute(2, 0, 1).clamp(0, 1) 
