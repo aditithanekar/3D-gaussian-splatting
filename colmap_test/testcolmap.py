@@ -132,8 +132,8 @@ def test_initial_render(gaussians, cameras_data):
     print("Visualization saved as 'initial_render.png'")
 
 # # Test it:
-gaussians, recon = test_initialization()
-cameras_data = load_cameras_from_colmap(recon)
+# gaussians, recon = test_initialization()
+# cameras_data = load_cameras_from_colmap(recon)
 
-# # Run the test
-test_initial_render(gaussians, cameras_data)
+# # # Run the test
+# test_initial_render(gaussians, cameras_data)

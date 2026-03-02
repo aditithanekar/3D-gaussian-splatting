@@ -198,7 +198,7 @@ losses = train_gaussians(model, cameras_data, num_iterations=300, lr=0.001)
 print("\nFinal comparison render...")
 
 with torch.no_grad():
-    cam_data = cameras_data[2]  # pick any view, preferably one not overfitted
+    cam_data = cameras_data[0]  # pick any view, preferably one not overfitted
     camera = cam_data['camera']
     gt_img = cam_data['target_image']  # numpy (H,W,3)
     
