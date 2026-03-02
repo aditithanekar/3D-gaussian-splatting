@@ -196,7 +196,7 @@ losses = train_gaussians(model, cameras_data, num_iterations=300, lr=0.001)
 
 # After training
 print("\nFinal comparison render...")
-
+from google.colab import files
 with torch.no_grad():
     cam_data = cameras_data[0]  # pick any view, preferably one not overfitted
     camera = cam_data['camera']
@@ -224,6 +224,9 @@ with torch.no_grad():
     
     plt.tight_layout()
     plt.savefig("final_comparison.png")
+    files.download("final_comparison.png")
+    print("hewwo you downloaded the final render")
+
     # plt.show()
 
 # Plot
@@ -233,6 +236,8 @@ plt.ylabel("L1 Loss")
 plt.title("Training Progress")
 plt.grid(True)
 plt.savefig("loss_curve.png")
+files.download("loss_curve.png")
+print("hewwo you downloaded the loss")
 # plt.show()
 
 
