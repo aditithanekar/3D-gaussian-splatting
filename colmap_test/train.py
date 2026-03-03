@@ -36,7 +36,7 @@ class GaussianModel(nn.Module):
         # clamp initial scales to prevent exploding bounding boxes
         with torch.no_grad():
             self.scales.clamp_(-3, 3)
-            self.scales.fill_(1.0)  # exp(1) ≈ 2.7 world units, much more visible
+            self.scales.fill_(-2.0)  # exp(1) ≈ 2.7 world units, much more visible
         
         print(f"Initialized model with {N} Gaussians")
         print(f"Total parameters: {sum(p.numel() for p in self.parameters())}")
@@ -47,9 +47,9 @@ class GaussianModel(nn.Module):
         scales     = torch.exp(self.scales)               # → positive scales
         opacities  = torch.sigmoid(self.opacities)        #  [0, 1]
         rotations  = torch.nn.functional.normalize(self.rotations, dim=-1)  # unit quaternions
-
+        colors = torch.sigmoid(self.colors)
         
-        return self.positions, scales, rotations, self.colors, opacities
+        return self.positions, scales, rotations, colors, opacities
     
     # FOR VISUALIZATION ONLY
     @torch.no_grad()
@@ -196,7 +196,6 @@ losses = train_gaussians(model, cameras_data, num_iterations=300, lr=0.001)
 
 # After training
 print("\nFinal comparison render...")
-from google.colab import files
 with torch.no_grad():
     cam_data = cameras_data[0]  # pick any view, preferably one not overfitted
     camera = cam_data['camera']
@@ -224,7 +223,6 @@ with torch.no_grad():
     
     plt.tight_layout()
     plt.savefig("final_comparison.png")
-    files.download("final_comparison.png")
     print("hewwo you downloaded the final render")
 
     # plt.show()
@@ -236,7 +234,6 @@ plt.ylabel("L1 Loss")
 plt.title("Training Progress")
 plt.grid(True)
 plt.savefig("loss_curve.png")
-files.download("loss_curve.png")
 print("hewwo you downloaded the loss")
 # plt.show()
 
