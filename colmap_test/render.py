@@ -128,6 +128,11 @@ def render_differentiable(
     
     covariance_camera = Jacobian @ W @ Sigma @ W.transpose(-1,-2) @ Jacobian.transpose(-1,-2)
     
+    # prints to check on covariance
+    with torch.no_grad():
+        diag = covariance_camera[:, [0,1], [0,1]]
+        print(f"cov diag min={diag.min().item():.4f} max={diag.max().item():.4f} mean={diag.mean().item():.4f}", flush=True)
+    
     #bounding box loop
     for i in range(len(pixel_x)):
         px = pixel_x[i].item()
@@ -193,9 +198,10 @@ def render_differentiable(
         # contributions.append((y_min, y_max, x_min, x_max, contrib))
         
         # Update image and transmittance immediately, in order
-        image = image.clone()
-        image[y_min:y_max+1, x_min:x_max+1] = \
-            image[y_min:y_max+1, x_min:x_max+1] + contrib
+        # Instead of cloning the whole image, just do:
+        current = image[y_min:y_max+1, x_min:x_max+1]   
+        image[y_min:y_max+1, x_min:x_max+1] = current + contrib
+        
         with torch.no_grad():
             transmittance[y_min:y_max+1, x_min:x_max+1] = \
                 t_slice * (1.0 - alpha.detach())
