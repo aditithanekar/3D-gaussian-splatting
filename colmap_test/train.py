@@ -36,7 +36,7 @@ class GaussianModel(nn.Module):
         # clamp initial scales to prevent exploding bounding boxes
         with torch.no_grad():
             self.scales.clamp_(-3, 3)
-            self.scales.fill_(-2.0)  # exp(1) ≈ 2.7 world units, much more visible
+            self.scales.fill_(-3.0)  # exp(1) ≈ 2.7 world units, much more visible
         
         print(f"Initialized model with {N} Gaussians")
         print(f"Total parameters: {sum(p.numel() for p in self.parameters())}")
@@ -191,7 +191,7 @@ print(f"  Colors: {model.colors.shape}")
 
 # Run training
 print("STARTING TRAINING")
-losses = train_gaussians(model, cameras_data, num_iterations=300, lr=0.001)
+losses = train_gaussians(model, cameras_data, num_iterations=30, lr=0.001)
 
 
 # After training
