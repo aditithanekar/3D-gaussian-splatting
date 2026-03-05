@@ -84,16 +84,12 @@ def render_differentiable(
     pixel_y = y_normalized * fy  + image_center_y
     
     
-    # Jacobian normalized device coords
-    Jacobian_ndc = torch.zeros(len(z), 2, 3, device=device)
-    J_ndc[:, 0, 0] = 1.0 / z
-    J_ndc[:, 0, 2] = -x / (z ** 2)
-    J_ndc[:, 1, 1] = 1.0 / z
-    J_ndc[:, 1, 2] = -y / (z ** 2)
-    # Jacobian[:, 0, 0] = fx / z
-    # Jacobian[:, 0, 2] = -fx * x / (z ** 2)
-    # Jacobian[:, 1, 1] = fy / z
-    # Jacobian[:, 1, 2] = -fy * y / (z ** 2)
+    # Jacobian 
+    Jacobian = torch.zeros(len(z), 2, 3, device=device)
+    Jacobian[:, 0, 0] = fx / z
+    Jacobian[:, 0, 2] = -fx * x / (z ** 2)
+    Jacobian[:, 1, 1] = fy / z
+    Jacobian[:, 1, 2] = -fy * y / (z ** 2)
     
     W = camera.R  #rotation defines the viewing transformation
         
@@ -130,14 +126,7 @@ def render_differentiable(
     # if R is rotation matrix and S is scaling matrix, covariance Sigma = R * S * S^T * R^T  
     Sigma = rot_matrix @ scale_matrix @ scale_matrix.transpose(-1,-2) @ rot_matrix.transpose(-1, -2)
     
-    covariance_camera_ndc = Jacobian_ndc @ W @ Sigma @ W.transpose(-1,-2) @ Jacobian_ndc.transpose(-1,-2)
-    
-    # Scale to pixels at the end
-    S = torch.zeros(len(z), 2, 2, device=device)
-    S[:, 0, 0] = fx
-    S[:, 1, 1] = fy
-
-    covariance_camera = S @ covariance_camera_ndc @ S.transpose(-1, -2)
+    covariance_camera = Jacobian @ W @ Sigma @ W.transpose(-1,-2) @ Jacobian.transpose(-1,-2)
     
     # prints to check on covariance
     with torch.no_grad():
