@@ -28,15 +28,16 @@ class GaussianModel(nn.Module):
         
         # turn np arrays into tensor parameters to be trainable
         self.positions = nn.Parameter(torch.from_numpy(positions).float())
-        self.scales = nn.Parameter(torch.from_numpy(scales).float())
+        self.scales = nn.Parameter(torch.log(torch.from_numpy(scales).float()))
         self.rotations = nn.Parameter(torch.from_numpy(rotations).float())
         self.colors = nn.Parameter(torch.from_numpy(colors).float())
-        self.opacities = nn.Parameter(torch.from_numpy(opacities).float())
+        self.opacities = nn.Parameter(torch.logit(torch.clamp(torch.from_numpy(opacities).float(), 1e-7, 1-1e-7)))
+        # self.opacities = nn.Parameter(torch.from_numpy(opacities).float())
 
-        # clamp initial scales to prevent exploding bounding boxes
-        with torch.no_grad():
-            self.scales.clamp_(-3, 3)
-            self.scales.fill_(-3.0)  # exp(1) ≈ 2.7 world units, much more visible
+        # # clamp initial scales to prevent exploding bounding boxes
+        # with torch.no_grad():
+        #     self.scales.clamp_(-3, 3)
+        #     self.scales.fill_(-3.0)  # exp(1) ≈ 2.7 world units, much more visible
         
         print(f"Initialized model with {N} Gaussians")
         print(f"Total parameters: {sum(p.numel() for p in self.parameters())}")
@@ -47,9 +48,8 @@ class GaussianModel(nn.Module):
         scales     = torch.exp(self.scales)               # → positive scales
         opacities  = torch.sigmoid(self.opacities)        #  [0, 1]
         rotations  = torch.nn.functional.normalize(self.rotations, dim=-1)  # unit quaternions
-        colors = torch.sigmoid(self.colors)
         
-        return self.positions, scales, rotations, colors, opacities
+        return self.positions, scales, rotations, self.colors, opacities
     
     # FOR VISUALIZATION ONLY
     @torch.no_grad()
@@ -62,7 +62,6 @@ class GaussianModel(nn.Module):
         scales_act     = torch.exp(self.scales).cpu().numpy()     # positive
         opacities_act  = torch.sigmoid(self.opacities).cpu().numpy()
         rotations_act  = torch.nn.functional.normalize(self.rotations, dim=-1).cpu().numpy()
-        colors_act     = torch.sigmoid(self.colors).cpu().numpy()   # or clamp
         
         for i in range(N):
             g = Gaussian3D(
@@ -161,6 +160,8 @@ def train_gaussians(model, cameras_data, num_iterations=10, lr=0.002):
         gt = torch.from_numpy(cam['target_image']).float().permute(2, 0, 1).to(device)  # (3,H,W)
         
         pos, sca, rot, col, opa = model.get_gaussian_tensors()
+        if i % 10 == 0:
+            print(f"Iter {i:3d} | mean scale: {sca.mean().item():.4f} | mean opacity: {opa.mean().item():.4f} | mean color: {col.mean().item():.4f}")
         rendered = render_differentiable(pos, sca, rot, col, opa, cam['camera'], gt.shape[2], gt.shape[1], device)
         
         loss = torch.mean(torch.abs(rendered - gt))
@@ -191,7 +192,7 @@ print(f"  Colors: {model.colors.shape}")
 
 # Run training
 print("STARTING TRAINING")
-losses = train_gaussians(model, cameras_data, num_iterations=30, lr=0.001)
+losses = train_gaussians(model, cameras_data, num_iterations=200, lr=0.001)
 
 
 # After training
