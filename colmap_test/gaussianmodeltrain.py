@@ -75,14 +75,14 @@ def build_covariance_3d(scales, quats):
 
 
 #  Project covariance to 2-D screen space
-def project_covariance_2d(Sigma3d, cam_points, R_cam, fx, fy):
+def project_covariance_2d(Sigma3d, view_points, R_cam, fx, fy):
     """
     Sigma3d   : (N,3,3)
-    cam_points: (N,3)   points already in camera space
+    view_points: (N,3)   points already in camera space
     R_cam     : (3,3)
     Returns   : (N,2,2) screen-space covariance
     """
-    x, y, z = cam_points[:,0], cam_points[:,1], cam_points[:,2]
+    x, y, z = view_points[:,0], view_points[:,1], view_points[:,2]
 
     # Jacobian of perspective projection  (N,2,3)
     zero = torch.zeros_like(x)
@@ -92,7 +92,7 @@ def project_covariance_2d(Sigma3d, cam_points, R_cam, fx, fy):
     ], dim=1).reshape(-1, 2, 3)
 
     # W = R_cam  (same for all gaussians)
-    W = R_cam.unsqueeze(0).expand(len(cam_points), -1, -1)   # (N,3,3)
+    W = R_cam.unsqueeze(0).expand(len(view_points), -1, -1)   # (N,3,3)
 
     JW = J @ W                         # (N,2,3)
     cov2d = JW @ Sigma3d @ JW.transpose(1, 2)   # (N,2,2)
@@ -122,8 +122,8 @@ def render_gaussians_torch(model: GaussianModel, camera, device='cpu'):
     alphas    = model.alphas.to(device)                  # (N,)
 
     #  World to camera coords 
-    cam_points = (centers - T_cam[None,:]) @ R_cam.T   # (N,3)
-    depths = cam_points[:, 2]                   # (N,)
+    view_points = (centers - T_cam[None,:]) @ R_cam.T   # (N,3)
+    depths = view_points[:, 2]                   # (N,)
 
     # Filter behind-camera gaussians (keep as mask, don't break graph)
     valid = depths > 0.0
@@ -136,8 +136,7 @@ def render_gaussians_torch(model: GaussianModel, camera, device='cpu'):
     print(f"any nan in depths: {torch.isnan(depths).any()}")
     print(f"valid count: {valid.sum()} / {len(valid)}")
 
-    cam_points = cam_points[valid]
-    print("hihi")
+    view_points = view_points[valid]
     colors_v   = colors[valid]
     alphas_v   = alphas[valid]
     scales_v   = scales[valid]
@@ -145,7 +144,7 @@ def render_gaussians_torch(model: GaussianModel, camera, device='cpu'):
     depths_v   = depths[valid]
 
     #  Project centers to pixel coords 
-    x, y, z = cam_points[:,0], cam_points[:,1], cam_points[:,2]
+    x, y, z = view_points[:,0], view_points[:,1], view_points[:,2]
     x_normalized = x / z
     y_normalized = y / z 
     px = x_normalized * fx + cx   # (N,)
@@ -155,7 +154,7 @@ def render_gaussians_torch(model: GaussianModel, camera, device='cpu'):
 
     #  Build 2-D covariance 
     Sigma3d = build_covariance_3d(scales_v, rots_v)                     # (N,3,3)
-    cov2d   = project_covariance_2d(Sigma3d, cam_points, R_cam, fx, fy) # (N,2,2)
+    cov2d   = project_covariance_2d(Sigma3d, view_points, R_cam, fx, fy) # (N,2,2)
 
     # Invert 2x2 analytically (faster + stable)
     a = cov2d[:,0,0]; b = cov2d[:,0,1]; d = cov2d[:,1,1]
@@ -227,6 +226,8 @@ def train(gaussians_list, cameras_data, n_epochs=500, lr=1e-3, device='cpu'):
     gaussians_list : list of Gaussian3D (your existing objects)
     cameras_data   : list of dicts with keys 'camera' and 'target_image' (H,W,3 float32 numpy)
     """
+    torch.autograd.set_detect_anomaly(True)
+    import psutil, gc
     model = GaussianModel(gaussians_list).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     l1_loss = nn.L1Loss()
@@ -234,7 +235,15 @@ def train(gaussians_list, cameras_data, n_epochs=500, lr=1e-3, device='cpu'):
 
 
     for epoch in range(n_epochs):
+        print(f"\n--- Iter {epoch}/{n_epochs} ---", flush=True)
         total_loss = 0.0
+        mem = psutil.virtual_memory()
+        print(f"RAM: {mem.used/1e9:.1f}GB / {mem.total/1e9:.1f}GB", flush=True)
+        if torch.cuda.is_available():
+            print(f"VRAM: {torch.cuda.memory_allocated()/1e9:.2f}GB allocated", flush=True)
+            torch.cuda.empty_cache()
+        #manual garbage collection
+        gc.collect()
         for cam_data in cameras_data:
             camera       = cam_data['camera']
             target_np    = cam_data['target_image']   # (H,W,3) float32
@@ -262,7 +271,6 @@ def train(gaussians_list, cameras_data, n_epochs=500, lr=1e-3, device='cpu'):
 
 
         if epoch % 10 == 0 or epoch == n_epochs - 1:
-            
             print(f"Epoch {epoch:4d} | loss {avg:.5f}")
 
     return model, loss_history
