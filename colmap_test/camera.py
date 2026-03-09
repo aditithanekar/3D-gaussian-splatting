@@ -1,6 +1,6 @@
 import numpy as np
 class Camera: 
-    def __init__(self, R, T, FoVx, FoVy, image_width, image_height):
+    def __init__(self, R, T, FoVx, FoVy, image_width, image_height, fx_raw=None, fy_raw=None, cx_raw=None, cy_raw=None):
         self.R = R #rotation matrix (3d)
         self.T = T #translation matrix         #x,y,z of camera
         self.FoVx = FoVx # field of view x in radians
@@ -9,6 +9,10 @@ class Camera:
         self.image_height=image_height
         self.zfar = 100.0
         self.znear = 0.01
+        self.fx_raw = fx_raw
+        self.fy_raw = fy_raw
+        self.cx_raw = cx_raw
+        self.cy_raw = cy_raw
     def world_to_camera(self, world_point):
         # we get the displacement between the world_point and the camera's location (x,y,z)
         # and then account for the rotation of the camera 

@@ -62,7 +62,7 @@ class GaussianModel(nn.Module):
         scales_act     = torch.exp(self.scales).cpu().numpy()     # positive
         opacities_act  = torch.sigmoid(self.opacities).cpu().numpy()
         rotations_act  = torch.nn.functional.normalize(self.rotations, dim=-1).cpu().numpy()
-        
+        colors_act = self.colors.cpu().numpy()
         for i in range(N):
             g = Gaussian3D(
                 center    = self.positions[i].cpu().numpy(),
@@ -229,6 +229,7 @@ with torch.no_grad():
     # plt.show()
 
 # Plot
+plt.figure() 
 plt.plot(losses)
 plt.xlabel("Iteration")
 plt.ylabel("L1 Loss")

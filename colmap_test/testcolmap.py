@@ -47,6 +47,11 @@ def load_cameras_from_colmap(reconstruction, images_path="images"):
         
         # Compute field of view from focal length
         fx = colmap_cam.params[0]  # focal length (depends on camera model)
+        # Inside the loop, after getting colmap_cam
+        fx_raw = colmap_cam.params[0]
+        fy_raw = colmap_cam.params[1] if len(colmap_cam.params) > 1 else fx_raw
+        cx_raw = colmap_cam.params[2] if len(colmap_cam.params) > 2 else width / 2
+        cy_raw = colmap_cam.params[3] if len(colmap_cam.params) > 3 else height / 2
         width = colmap_cam.width
         height = colmap_cam.height
         
@@ -65,7 +70,11 @@ def load_cameras_from_colmap(reconstruction, images_path="images"):
             FoVx=FoVx,
             FoVy=FoVy,
             image_width=width,
-            image_height=height
+            image_height=height, 
+            fx_raw=fx_raw,
+            fy_raw=fy_raw,
+            cx_raw=cx_raw,
+            cy_raw=cy_raw
         )
         
         cameras_data.append({
