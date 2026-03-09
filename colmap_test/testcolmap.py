@@ -1,4 +1,5 @@
-# test_colmap_init.py
+import os
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 import pycolmap as colmap
 from gaussian3d import Gaussian3D
 import numpy as np
@@ -6,6 +7,10 @@ from camera import Camera
 from PIL import Image
 import matplotlib.pyplot as plt
 from main import render_multiple_gaussians  # render function
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from gaussianmodeltrain import GaussianModel, render_gaussians_torch, train
 
 def test_initialization():
     # Load COLMAP output created
@@ -61,7 +66,9 @@ def load_cameras_from_colmap(reconstruction, images_path="images"):
         
         # Load target image
         img_path = f"{images_path}/{colmap_image.name}"
-        target_img = np.array(Image.open(img_path)).astype(np.float32) / 255.0
+        target_img = np.array(Image.open(img_path).convert("RGB")).astype(np.float32) / 255.0
+
+        # target_img = np.array(Image.open(img_path)).astype(np.float32) / 255.0
         
         camera_center = -R.T @ t  # actual camera position in world space
         # Create Camera object
@@ -140,10 +147,55 @@ def test_initial_render(gaussians, cameras_data):
     plt.show()
     
     print("Visualization saved as 'initial_render.png'")
+# preview the render
+def preview_pytorch_render(gaussians_list, cameras_data, cam_index=0, device='cpu'):
+    model = GaussianModel(gaussians_list)
+    print("hi1")
+    cam_data = cameras_data[cam_index]
+    camera = cam_data['camera']
+    target = cam_data['target_image']
 
+    with torch.no_grad():
+        print("hi2")
+        rendered = render_gaussians_torch(model, camera, device)
+    print("hi3")
+    rendered_np = rendered.numpy()
+    loss = np.mean(np.abs(target - rendered_np))
+    print("hi4")
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    axes[0].imshow(np.clip(target, 0, 1))
+    axes[0].set_title("Target")
+    axes[1].imshow(np.clip(rendered_np, 0, 1))
+    axes[1].set_title(f"Rendered | L1: {loss:.4f}")
+    axes[2].imshow(np.clip(np.abs(target - rendered_np), 0, 1))
+    axes[2].set_title("Difference")
+    for ax in axes: ax.axis('off')
+    plt.tight_layout()
+    plt.savefig("preview_render.png", dpi=150, bbox_inches='tight')
+    plt.close()
+    
 # # Test it:
-# gaussians, recon = test_initialization()
-# cameras_data = load_cameras_from_colmap(recon)
+gaussians, recon = test_initialization()
+cameras_data = load_cameras_from_colmap(recon)
 
 # # # Run the test
 # test_initial_render(gaussians, cameras_data)
+# model = GaussianModel(gaussians)
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+preview_pytorch_render(gaussians, cameras_data, cam_index=0, device=device)
+
+# model, losses = train(gaussians, cameras_data, n_epochs=30, device=device)
+
+# # plot loss curve
+# plt.figure()
+# plt.plot(losses)
+# plt.xlabel("Epoch")
+# plt.ylabel("L1 Loss")
+# plt.title("Training Loss")
+# plt.savefig("loss_curve.png")
+# plt.close()
+
+# # render final result
+# with torch.no_grad():
+#     final = render_gaussians_torch(model, cameras_data[0]['camera'])

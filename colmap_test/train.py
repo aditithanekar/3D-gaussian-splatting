@@ -4,7 +4,7 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 import torch
 import torch.nn as nn
 import numpy as np
-from testcolmap import test_initialization, load_cameras_from_colmap
+# from testcolmap import test_initialization, load_cameras_from_colmap
 import torch.optim as optim
 from main import render_multiple_gaussians
 from gaussian3d import Gaussian3D
