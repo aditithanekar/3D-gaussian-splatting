@@ -79,12 +79,13 @@ def render_differentiable(
     # image_center_x = camera.image_width / 2
     # image_center_y = camera.image_height / 2
     fx = camera.fx_raw
-    fy = camera.fy_raw
+    fy = camera.fy_raw * (height / width) #changed to try to fix
     
     #scale the normalized x and y to 2d, and make it so center is in top left corner to avoid negatives
     pixel_x = x_normalized * fx + camera.cx_raw
     pixel_y = y_normalized * fy  + camera.cy_raw
     
+
     print(f"Raw intrinsics: fx={camera.fx_raw:.1f}, fy={camera.fy_raw:.1f}, "
       f"cx={camera.cx_raw:.1f}, cy={camera.cy_raw:.1f}")
     print(f"Recomputed fx from FoV: {camera.image_width / (2 * math.tan(camera.FoVx / 2)):.1f}")

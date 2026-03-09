@@ -50,10 +50,11 @@ def load_cameras_from_colmap(reconstruction, images_path="images"):
         # Inside the loop, after getting colmap_cam
         fx_raw = colmap_cam.params[0]
         fy_raw = colmap_cam.params[1] if len(colmap_cam.params) > 1 else fx_raw
-        cx_raw = colmap_cam.params[2] if len(colmap_cam.params) > 2 else width / 2
-        cy_raw = colmap_cam.params[3] if len(colmap_cam.params) > 3 else height / 2
+        
         width = colmap_cam.width
         height = colmap_cam.height
+        cx_raw = colmap_cam.params[2] if len(colmap_cam.params) > 2 else width / 2
+        cy_raw = height / 2
         
         FoVx = 2 * np.arctan(width / (2 * fx))
         FoVy = 2 * np.arctan(height / (2 * fx))  # Assuming square pixels
@@ -82,7 +83,7 @@ def load_cameras_from_colmap(reconstruction, images_path="images"):
             'target_image': target_img,
             'name': colmap_image.name
         })
-    
+    print(f"Image: {colmap_image.name} | Model: {colmap_cam.model} | Params: {colmap_cam.params}")
     print(f"Loaded {len(cameras_data)} cameras with target images")
     for i, cam_data in enumerate(cameras_data):
         cam = cam_data['camera']
