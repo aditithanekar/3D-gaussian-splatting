@@ -211,9 +211,16 @@ def render_gaussians_torch(model: GaussianModel, camera, device='cpu'):
         gauss_w = torch.exp(-0.5 * (dx*dx*inv_a[i] + 2*dx*dy*inv_b[i] + dy*dy*inv_d[i]))
 
         alpha_map = alphas_v[i] * gauss_w
-        contrib = transmittance[y_min:y_max+1, x_min:x_max+1] * alpha_map
-        image[y_min:y_max+1, x_min:x_max+1] += contrib.unsqueeze(-1) * colors_v[i]
-        transmittance[y_min:y_max+1, x_min:x_max+1] *= (1.0 - alpha_map.detach())
+        
+        # transmittance is a weight, keep it detached
+        t_slice = transmittance[y_min:y_max+1, x_min:x_max+1].detach()
+
+        contrib = t_slice * alpha_map  # (h', w')
+        image[y_min:y_max+1, x_min:x_max+1] = \
+            image[y_min:y_max+1, x_min:x_max+1] + contrib.unsqueeze(-1) * colors_v[i]
+        
+        transmittance[y_min:y_max+1, x_min:x_max+1] = \
+            t_slice * (1.0 - alpha_map.detach())
 
     return image   # (H,W,3)
 
