@@ -179,6 +179,7 @@ def render_gaussians_torch(model: GaussianModel, camera, device='cpu'):
 
     image         = torch.zeros(H, W, 3, device=device)
     transmittance = torch.ones( H, W,    device=device)
+    contributions = []
 
     for i in range(len(px)):
         px_i = px[i]
@@ -213,15 +214,19 @@ def render_gaussians_torch(model: GaussianModel, camera, device='cpu'):
         alpha_map = alphas_v[i] * gauss_w
         
         # transmittance is a weight, keep it detached
-        t_slice = transmittance[y_min:y_max+1, x_min:x_max+1].detach()
+        t_slice = transmittance[y_min:y_max+1, x_min:x_max+1].detach().clone()
 
         contrib = t_slice * alpha_map  # (h', w')
-        image[y_min:y_max+1, x_min:x_max+1] = \
-            image[y_min:y_max+1, x_min:x_max+1] + contrib.unsqueeze(-1) * colors_v[i]
+        #not updating image yet and adding into contributions
+        contributions.append((y_min, y_max, x_min, x_max, contrib.unsqueeze(-1) * colors_v[i]))
         
-        transmittance[y_min:y_max+1, x_min:x_max+1] = \
-            t_slice * (1.0 - alpha_map.detach())
-
+        with torch.no_grad():
+            transmittance[y_min:y_max+1, x_min:x_max+1] = t_slice * (1.0 - alpha_map.detach())
+    # build image by padding each contribution to full size and summing
+    for y_min, y_max, x_min, x_max, contrib in contributions:
+        padded = torch.zeros(H, W, 3, device=device)
+        padded[y_min:y_max+1, x_min:x_max+1] = contrib
+        image = image + padded
     return image   # (H,W,3)
 
 
