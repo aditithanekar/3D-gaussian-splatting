@@ -128,13 +128,7 @@ def render_gaussians_torch(model: GaussianModel, camera, device='cpu'):
     # Filter behind-camera gaussians (keep as mask, don't break graph)
     valid = depths > 0.0
     if not valid.any():
-        return torch.zeros(3, H, W, device=device)
-    
-    print(f"centers shape: {centers.shape}")
-    print(f"depths min/max: {depths.min():.3f} / {depths.max():.3f}")
-    print(f"any nan in centers: {torch.isnan(centers).any()}")
-    print(f"any nan in depths: {torch.isnan(depths).any()}")
-    print(f"valid count: {valid.sum()} / {len(valid)}")
+        return torch.zeros(3, H, W, device=device) 
 
     view_points = view_points[valid]
     colors_v   = colors[valid]

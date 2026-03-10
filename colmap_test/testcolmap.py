@@ -150,18 +150,14 @@ def test_initial_render(gaussians, cameras_data):
 # preview the render
 def preview_pytorch_render(gaussians_list, cameras_data, cam_index=0, device='cpu'):
     model = GaussianModel(gaussians_list)
-    print("hi1")
     cam_data = cameras_data[cam_index]
     camera = cam_data['camera']
     target = cam_data['target_image']
 
     with torch.no_grad():
-        print("hi2")
         rendered = render_gaussians_torch(model, camera, device)
-    print("hi3")
     rendered_np = rendered.cpu().numpy()
     loss = np.mean(np.abs(target - rendered_np))
-    print("hi4")
 
     fig, axes = plt.subplots(1, 3, figsize=(15, 5))
     axes[0].imshow(np.clip(target, 0, 1))
