@@ -118,7 +118,7 @@ def render_gaussians_torch(model: GaussianModel, camera, device='cpu'):
     
     scales    = model.scales.to(device)     # (N,3)
     rotations = model.rotations.to(device)  # (N,4)
-    colors    = torch.sigmoid(model.colors).to(device)  # (N,3)  keep in [0,1]
+    colors = torch.clamp(model.colors, 0.0, 1.0).to(device)  # (N,3)  keep in [0,1]
     alphas    = model.alphas.to(device)                  # (N,)
 
     #  World to camera coords 
@@ -180,42 +180,40 @@ def render_gaussians_torch(model: GaussianModel, camera, device='cpu'):
     image         = torch.zeros(H, W, 3, device=device)
     transmittance = torch.ones( H, W,    device=device)
 
-    N = px.shape[0]
-    # Process in chunks to avoid huge (N,H,W) tensors on GPU memory
-    chunk = 8
+    for i in range(len(px)):
+        px_i = px[i]
+        py_i = py[i]
+        
+        # bounding box
+        sigma_x = torch.sqrt(torch.clamp(cov2d[i,0,0], min=1e-8))
+        sigma_y = torch.sqrt(torch.clamp(cov2d[i,1,1], min=1e-8))
+        radius = float(torch.clamp(torch.max(sigma_x, sigma_y) * 3.5, max=200.0))
 
-    for start in range(0, N, chunk):
-        end = min(start + chunk, N)
+        x_min = max(0, int(px_i.item() - radius))
+        x_max = min(W-1, int(px_i.item() + radius + 0.999))
+        y_min = max(0, int(py_i.item() - radius))
+        y_max = min(H-1, int(py_i.item() + radius + 0.999))
 
-        # offsets from each gaussian center to every pixel  (C, H, W)
-        C = end - start
-        dx = grid_x.unsqueeze(0) - px[start:end].reshape(C, 1, 1)   # (C,H,W)
-        dy = grid_y.unsqueeze(0) - py[start:end].reshape(C, 1, 1)   # (C,H,W)
+        #bounds check
+        if x_min > x_max or y_min > y_max:
+            continue
 
-        ia = inv_a[start:end].reshape(C, 1, 1)
-        ib = inv_b[start:end].reshape(C, 1, 1)
-        id_ = inv_d[start:end].reshape(C, 1, 1)
+        # small local grid only — no big H,W tensors
+        yy, xx = torch.meshgrid(
+            torch.arange(y_min, y_max+1, device=device, dtype=torch.float32),
+            torch.arange(x_min, x_max+1, device=device, dtype=torch.float32),
+            indexing='ij'
+        )
+        dx = xx - px_i
+        dy = yy - py_i
 
-        # Mahalanobis distance
-        maha = 0.5 * (dx*dx*ia + 2*dx*dy*ib + dy*dy*id_)   # (C,H,W)
+        # simple gaussian weight using inv covariance (same as mahalanobis but local)
+        gauss_w = torch.exp(-0.5 * (dx*dx*inv_a[i] + 2*dx*dy*inv_b[i] + dy*dy*inv_d[i]))
 
-        # Bounding-box mask: skip pixels more than 3.5σ away (saves compute)
-        sigma_x = torch.sqrt(1.0 / (ia.squeeze() + 1e-8))
-        sigma_y = torch.sqrt(1.0 / (id_.squeeze() + 1e-8))
-        radius = torch.max(sigma_x, sigma_y).reshape(C, 1, 1) * 3.5
-        in_bounds = (dx.abs() < radius) & (dy.abs() < radius)
-
-        gauss_w = torch.exp(-maha) * in_bounds.float()   # (C,H,W)
-
-        a_chunk = alphas_v[start:end].reshape(C, 1, 1)   # (C,1,1)
-        c_chunk = colors_v[start:end]                     # (C,3)
-
-        for i in range(C):
-            alpha_map = a_chunk[i, 0, 0] * gauss_w[i]       # (H,W)
-            # alpha composite
-            contrib = transmittance * alpha_map              # (H,W)
-            image += contrib.unsqueeze(-1) * c_chunk[i]     # (H,W,3)
-            transmittance = transmittance * (1.0 - alpha_map)
+        alpha_map = alphas_v[i] * gauss_w
+        contrib = transmittance[y_min:y_max+1, x_min:x_max+1] * alpha_map
+        image[y_min:y_max+1, x_min:x_max+1] += contrib.unsqueeze(-1) * colors_v[i]
+        transmittance[y_min:y_max+1, x_min:x_max+1] *= (1.0 - alpha_map.detach())
 
     return image   # (H,W,3)
 
