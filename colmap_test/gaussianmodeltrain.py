@@ -179,7 +179,7 @@ def render_gaussians_torch(model: GaussianModel, camera, device='cpu'):
 
     image         = torch.zeros(H, W, 3, device=device)
     transmittance = torch.ones( H, W,    device=device)
-    contributions = []
+    # contributions = []
 
     for i in range(len(px)):
         px_i = px[i]
@@ -205,28 +205,27 @@ def render_gaussians_torch(model: GaussianModel, camera, device='cpu'):
             torch.arange(x_min, x_max+1, device=device, dtype=torch.float32),
             indexing='ij'
         )
-        dx = xx - px_i
-        dy = yy - py_i
-
-        # simple gaussian weight using inv covariance (same as mahalanobis but local)
-        gauss_w = torch.exp(-0.5 * (dx*dx*inv_a[i] + 2*dx*dy*inv_b[i] + dy*dy*inv_d[i]))
-
-        alpha_map = alphas_v[i] * gauss_w
         
-        # transmittance is a weight, keep it detached
-        t_slice = transmittance[y_min:y_max+1, x_min:x_max+1].detach().clone()
+        offset = torch.stack([xx - px_i, yy - py_i], dim=-1)  # (h',w',2)
 
-        contrib = t_slice * alpha_map  # (h', w')
-        #not updating image yet and adding into contributions
-        contributions.append((y_min, y_max, x_min, x_max, contrib.unsqueeze(-1) * colors_v[i]))
-        
+        # use full cov_inv for accurate gaussian shape
+        cov_i = cov2d[i]
+        cov_inv = torch.inverse(cov_i)
+        dist = torch.sum(offset * (offset @ cov_inv), dim=-1)  # (h',w')
+        gauss_w = torch.exp(-0.5 * dist)
+
+        alpha_map = alphas_v[i] * gauss_w  # (h',w')
+
+        with torch.no_grad():
+            t_slice = transmittance[y_min:y_max+1, x_min:x_max+1].clone()
+
+        contrib = t_slice[..., None] * alpha_map[..., None] * colors_v[i]  # (h',w',3)
+
+        image[y_min:y_max+1, x_min:x_max+1] = image[y_min:y_max+1, x_min:x_max+1] + contrib
+
         with torch.no_grad():
             transmittance[y_min:y_max+1, x_min:x_max+1] = t_slice * (1.0 - alpha_map.detach())
-    # build image by padding each contribution to full size and summing
-    for y_min, y_max, x_min, x_max, contrib in contributions:
-        padded = torch.zeros(H, W, 3, device=device)
-        padded[y_min:y_max+1, x_min:x_max+1] = contrib
-        image = image + padded
+    
     return image   # (H,W,3)
 
 
