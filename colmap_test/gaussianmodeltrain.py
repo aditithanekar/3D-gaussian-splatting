@@ -116,7 +116,7 @@ def render_gaussians_torch(model: GaussianModel, camera, device='cpu'):
 
     centers   = model.centers.to(device)    # (N,3)
     
-    scales    = model.scales.to(device)     # (N,3)
+    scales    = torch.clamp(model.scales, min=1e-4, max=10.0).to(device)   # (N,3)
     rotations = model.rotations.to(device)  # (N,4)
     colors = torch.clamp(model.colors, 0.0, 1.0).to(device)  # (N,3)  keep in [0,1]
     alphas    = model.alphas.to(device)                  # (N,)
@@ -266,7 +266,11 @@ def train(gaussians_list, cameras_data, n_epochs=500, lr=1e-3, device='cpu'):
                 target   = target[:h, :w]
 
             loss = l1_loss(rendered, target)
+            if torch.isnan(loss):
+                print(f"NaN loss at epoch {epoch}, camera {cam_data['name']}")
+                continue
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
             total_loss += loss.item()
         avg = total_loss / max(len(cameras_data), 1)
