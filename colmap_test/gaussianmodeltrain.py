@@ -187,7 +187,7 @@ def render_gaussians_torch(model: GaussianModel, camera, device='cpu'):
         # bounding box
         sigma_x = torch.sqrt(torch.clamp(cov2d[i,0,0], min=1e-8))
         sigma_y = torch.sqrt(torch.clamp(cov2d[i,1,1], min=1e-8))
-        radius = float(torch.clamp(torch.max(sigma_x, sigma_y) * 3.5, max=200.0))
+        radius = float(torch.clamp(torch.max(sigma_x, sigma_y) * 3.5, max=200.0).detach())
 
         x_min = max(0, int(px_i.item() - radius))
         x_max = min(W-1, int(px_i.item() + radius + 0.999))
