@@ -66,9 +66,10 @@ def load_cameras_from_colmap(reconstruction, images_path="images"):
         
         # Load target image
         img_path = f"{images_path}/{colmap_image.name}"
-        target_img = np.array(Image.open(img_path).convert("RGB")).astype(np.float32) / 255.0
+        target_img = Image.open(img_path).convert("RGB")
+        target_img = target_img.resize((800, 600), Image.LANCZOS) # downscale it to see if we get better results
+        target_img = np.array(target_img).astype(np.float32) / 255.0
 
-        # target_img = np.array(Image.open(img_path)).astype(np.float32) / 255.0
         
         camera_center = -R.T @ t  # actual camera position in world space
         # Create Camera object
@@ -77,8 +78,8 @@ def load_cameras_from_colmap(reconstruction, images_path="images"):
             T=camera_center, #changed this
             FoVx=FoVx,
             FoVy=FoVy,
-            image_width=width,
-            image_height=height, 
+            image_width=800,#width
+            image_height=600, #height
             fx_raw=fx_raw,
             fy_raw=fy_raw,
             cx_raw=cx_raw,
