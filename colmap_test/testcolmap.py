@@ -195,6 +195,24 @@ plt.close()
 
 # render final result
 with torch.no_grad():
+    final = render_gaussians_torch(model, cameras_data[0]['camera'])
+    final_np = final.cpu().numpy()
+    target = cameras_data[0]['target_image']
+    
+    plt.figure()
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    axes[0].imshow(np.clip(target, 0, 1))
+    axes[0].set_title("Target")
+    axes[1].imshow(np.clip(final_np, 0, 1))
+    axes[1].set_title("Final Render")
+    axes[2].imshow(np.clip(np.abs(target - final_np), 0, 1))
+    axes[2].set_title("Difference")
+    for ax in axes: ax.axis('off')
+    plt.tight_layout()
+    plt.savefig("final_render0.png")
+    plt.close()
+
+    
     final = render_gaussians_torch(model, cameras_data[1]['camera'])
     final_np = final.cpu().numpy()
     target = cameras_data[1]['target_image']
@@ -244,4 +262,21 @@ with torch.no_grad():
     for ax in axes: ax.axis('off')
     plt.tight_layout()
     plt.savefig("final_render3.png")
+    plt.close()
+    
+    final = render_gaussians_torch(model, cameras_data[4]['camera'])
+    final_np = final.cpu().numpy()
+    target = cameras_data[4]['target_image']
+    
+    plt.figure()
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    axes[0].imshow(np.clip(target, 0, 1))
+    axes[0].set_title("Target")
+    axes[1].imshow(np.clip(final_np, 0, 1))
+    axes[1].set_title("Final Render")
+    axes[2].imshow(np.clip(np.abs(target - final_np), 0, 1))
+    axes[2].set_title("Difference")
+    for ax in axes: ax.axis('off')
+    plt.tight_layout()
+    plt.savefig("final_render4.png")
     plt.close()
