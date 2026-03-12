@@ -229,7 +229,7 @@ def train(gaussians_list, cameras_data, n_epochs=500, lr=1e-3, device='cpu'):
     gaussians_list : list of Gaussian3D (your existing objects)
     cameras_data   : list of dicts with keys 'camera' and 'target_image' (H,W,3 float32 numpy)
     """
-    torch.autograd.set_detect_anomaly(True)
+    # torch.autograd.set_detect_anomaly(True)
     import psutil, gc
     model = GaussianModel(gaussians_list).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
@@ -273,14 +273,61 @@ def train(gaussians_list, cameras_data, n_epochs=500, lr=1e-3, device='cpu'):
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
             total_loss += loss.item()
+        # densify every 50 epochs, but not epoch 0
+        if epoch > 0 and epoch % 50 == 0:
+            print(f"\nDensifying at epoch {epoch}...")
+            #call densification func
+            densify_and_prune(model, 
+                            split_thresh=0.3,
+                            prune_alpha_thresh=0.01, 
+                            streak_ratio_thresh=10.0,
+                            device=device)
+            # reinit optimizer since parameters changed
+            optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+            torch.cuda.empty_cache()
         avg = total_loss / max(len(cameras_data), 1)
         loss_history.append(avg)
 
-
-        if epoch % 10 == 0 or epoch == n_epochs - 1:
-            print(f"Epoch {epoch:4d} | loss {avg:.5f}")
+        print(f"Epoch {epoch:4d} | loss {avg:.5f} | gaussians: {len(model.centers)}")
 
     return model, loss_history
+
+def densify_and_prune(model, split_thresh=0.3, prune_alpha_thresh=0.01, streak_ratio_thresh=10.0, device='cpu'):
+    with torch.no_grad():
+        scales  = torch.clamp(model.scales, min=1e-6)   # (N,3)
+        alphas  = model.alphas                            # (N,)
+
+        scale_max   = scales.max(dim=1).values            # (N,)
+        scale_min   = scales.min(dim=1).values            # (N,)
+        scale_ratio = scale_max / (scale_min + 1e-6)      # (N,)
+
+        print(f"  scale ratio: mean={scale_ratio.mean():.1f} max={scale_ratio.max():.1f}")
+        print(f"  gaussians before: {len(alphas)}")
+
+        # masks
+        too_transparent = alphas < prune_alpha_thresh
+        too_streaky     = scale_ratio > streak_ratio_thresh
+        to_split        = scale_max > split_thresh
+
+        # keep = not pruned and not being split (split replaces with 2 new ones)
+        keep = ~too_transparent & ~too_streaky & ~to_split
+
+        # split: duplicate with half scale
+        new_centers   = model.centers[to_split].repeat(2, 1)
+        new_scales    = model.scales[to_split].repeat(2, 1) * 0.5
+        new_rotations = model.rotations[to_split].repeat(2, 1)
+        new_colors    = model.colors[to_split].repeat(2, 1)
+        new_alpha     = model.raw_alpha[to_split].repeat(2)
+
+        # combine kept originals + split replacements
+        model.centers   = nn.Parameter(torch.cat([model.centers[keep],   new_centers  ]).to(device))
+        model.scales    = nn.Parameter(torch.cat([model.scales[keep],    new_scales   ]).to(device))
+        model.rotations = nn.Parameter(torch.cat([model.rotations[keep], new_rotations]).to(device))
+        model.colors    = nn.Parameter(torch.cat([model.colors[keep],    new_colors   ]).to(device))
+        model.raw_alpha = nn.Parameter(torch.cat([model.raw_alpha[keep], new_alpha    ]).to(device))
+
+        print(f"  kept={keep.sum()}, split={to_split.sum()*2} added, pruned={too_transparent.sum()+too_streaky.sum()}")
+        print(f"  gaussians after: {len(model.centers)}")
 
 
 
