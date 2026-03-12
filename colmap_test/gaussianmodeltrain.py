@@ -273,8 +273,8 @@ def train(gaussians_list, cameras_data, n_epochs=500, lr=1e-3, device='cpu'):
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
             total_loss += loss.item()
-        # densify every 50 epochs, but not epoch 0
-        if epoch > 0 and epoch % 50 == 0:
+        # densify every 10 epochs, but not epoch 0
+        if epoch > 0 and epoch % 10 == 0:
             print(f"\nDensifying at epoch {epoch}...")
             #call densification func
             densify_and_prune(model, 
