@@ -278,9 +278,9 @@ def train(gaussians_list, cameras_data, n_epochs=500, lr=1e-3, device='cpu'):
             print(f"\nDensifying at epoch {epoch}...")
             #call densification func
             densify_and_prune(model, 
-                            split_thresh=0.1,
+                            split_thresh=0.15,
                             prune_alpha_thresh=0.01, 
-                            streak_ratio_thresh=5.0,
+                            streak_ratio_thresh=3.0,
                             device=device)
             # reinit optimizer since parameters changed
             optimizer = torch.optim.Adam(model.parameters(), lr=lr)
@@ -328,6 +328,9 @@ def densify_and_prune(model, split_thresh=0.3, prune_alpha_thresh=0.01, streak_r
 
         print(f"  kept={keep.sum()}, split={to_split.sum()*2} added, pruned={too_transparent.sum()+too_streaky.sum()}")
         print(f"  gaussians after: {len(model.centers)}")
+        print(f"  too_transparent: {too_transparent.sum()}")
+        print(f"  too_streaky: {too_streaky.sum()}")
+        print(f"  to_split: {to_split.sum()}")
 
 
 
