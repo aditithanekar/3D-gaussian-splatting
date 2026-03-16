@@ -182,7 +182,7 @@ cameras_data = load_cameras_from_colmap(recon)
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 preview_pytorch_render(gaussians, cameras_data, cam_index=0, device=device)
 
-model, losses = train(gaussians, cameras_data,  n_epochs=91, device=device)
+model, losses = train(gaussians, cameras_data,  n_epochs=220, device=device)
 
 # # plot loss curve
 plt.figure()
