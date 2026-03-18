@@ -252,7 +252,6 @@ def train(gaussians_list, cameras_data, n_epochs=500, lr=1e-3, device='cpu'):
             target_np    = cam_data['target_image']   # (H,W,3) float32
 
             target = torch.tensor(target_np, dtype=torch.float32, device=device)
-            mask   = torch.tensor(cam_data['mask'], dtype=torch.float32, device=device)            
 
             optimizer.zero_grad()
 
@@ -265,11 +264,9 @@ def train(gaussians_list, cameras_data, n_epochs=500, lr=1e-3, device='cpu'):
                 w = min(rendered.shape[1], target.shape[1])
                 rendered = rendered[:h, :w]
                 target   = target[:h, :w]
-            #check shape
-            if mask.shape != rendered.shape[:2]:
-                mask = mask[:rendered.shape[0], :rendered.shape[1]]
+            
 
-            loss = l1_loss(rendered * mask[...,None], target * mask[...,None])
+            loss = l1_loss(rendered, target)
             if torch.isnan(loss):
                 print(f"NaN loss at epoch {epoch}, camera {cam_data['name']}")
                 continue

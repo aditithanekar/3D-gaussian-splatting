@@ -11,7 +11,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from gaussianmodeltrain import GaussianModel, render_gaussians_torch, train
-from rembg import remove
 import imageio.v2 as imageio
 
 
@@ -72,9 +71,6 @@ def load_cameras_from_colmap(reconstruction, images_path="images"):
         target_img = Image.open(img_path).convert("RGB")
         target_img = target_img.resize((800, 600), Image.LANCZOS) # downscale it to see if we get better results
         
-        # generate mask from the rembg remove
-        mask_img = remove(target_img, only_mask=True)  # PIL grayscale
-        mask_np = np.array(mask_img).astype(np.float32) / 255.0  # (H,W)
         target_img = np.array(target_img).astype(np.float32) / 255.0
 
         
@@ -96,7 +92,6 @@ def load_cameras_from_colmap(reconstruction, images_path="images"):
         cameras_data.append({
             'camera': cam,
             'target_image': target_img,
-            'mask':mask_np,
             'name': colmap_image.name
         })
     print(f"Image: {colmap_image.name} | Model: {colmap_cam.model} | Params: {colmap_cam.params}")
@@ -228,17 +223,6 @@ def render_video(model, cameras, device='cuda', output_path='output.mp4', fps=24
 gaussians, recon = test_initialization()
 cameras_data = load_cameras_from_colmap(recon)
 
-#check what the masks look like
-fig, axes = plt.subplots(2, len(cameras_data), figsize=(20, 8))
-for i, cam_data in enumerate(cameras_data):
-    axes[0, i].imshow(cam_data['target_image'])
-    axes[0, i].set_title(f"Image {i}")
-    axes[1, i].imshow(cam_data['mask'], cmap='gray')
-    axes[1, i].set_title(f"Mask {i}")
-for ax in axes.flat:
-    ax.axis('off')
-plt.tight_layout()
-plt.savefig('masks_preview.png')
 
 # # # Run the test
 # test_initial_render(gaussians, cameras_data)
