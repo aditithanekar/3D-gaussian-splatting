@@ -183,6 +183,18 @@ def preview_pytorch_render(gaussians_list, cameras_data, cam_index=0, device='cp
 gaussians, recon = test_initialization()
 cameras_data = load_cameras_from_colmap(recon)
 
+#check what the masks look like
+fig, axes = plt.subplots(2, len(cameras_data), figsize=(20, 8))
+for i, cam_data in enumerate(cameras_data):
+    axes[0, i].imshow(cam_data['target_image'])
+    axes[0, i].set_title(f"Image {i}")
+    axes[1, i].imshow(cam_data['mask'], cmap='gray')
+    axes[1, i].set_title(f"Mask {i}")
+for ax in axes.flat:
+    ax.axis('off')
+plt.tight_layout()
+plt.savefig('masks_preview.png')
+
 # # # Run the test
 # test_initial_render(gaussians, cameras_data)
 # model = GaussianModel(gaussians)
