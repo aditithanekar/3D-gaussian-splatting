@@ -11,6 +11,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from gaussianmodeltrain import GaussianModel, render_gaussians_torch, train
+from rembg import remove
+
 
 def test_initialization():
     # Load COLMAP output created
@@ -68,6 +70,10 @@ def load_cameras_from_colmap(reconstruction, images_path="images"):
         img_path = f"{images_path}/{colmap_image.name}"
         target_img = Image.open(img_path).convert("RGB")
         target_img = target_img.resize((800, 600), Image.LANCZOS) # downscale it to see if we get better results
+        
+        # generate mask from the rembg remove
+        mask_img = remove(target_img, only_mask=True)  # PIL grayscale
+        mask_np = np.array(mask_img).astype(np.float32) / 255.0  # (H,W)
         target_img = np.array(target_img).astype(np.float32) / 255.0
 
         
@@ -89,6 +95,7 @@ def load_cameras_from_colmap(reconstruction, images_path="images"):
         cameras_data.append({
             'camera': cam,
             'target_image': target_img,
+            'mask':mask_np,
             'name': colmap_image.name
         })
     print(f"Image: {colmap_image.name} | Model: {colmap_cam.model} | Params: {colmap_cam.params}")
@@ -182,7 +189,7 @@ cameras_data = load_cameras_from_colmap(recon)
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 preview_pytorch_render(gaussians, cameras_data, cam_index=0, device=device)
 
-model, losses = train(gaussians, cameras_data,  n_epochs=220, device=device)
+model, losses = train(gaussians, cameras_data,  n_epochs=45, device=device)
 
 # # plot loss curve
 plt.figure()
