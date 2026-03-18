@@ -228,36 +228,25 @@ def render_video(model, cameras, device='cuda', output_path='output.mp4', fps=24
 gaussians, recon = test_initialization()
 cameras_data = load_cameras_from_colmap(recon)
 
-#check what the masks look like
-fig, axes = plt.subplots(2, len(cameras_data), figsize=(20, 8))
-for i, cam_data in enumerate(cameras_data):
-    axes[0, i].imshow(cam_data['target_image'])
-    axes[0, i].set_title(f"Image {i}")
-    axes[1, i].imshow(cam_data['mask'], cmap='gray')
-    axes[1, i].set_title(f"Mask {i}")
-for ax in axes.flat:
-    ax.axis('off')
-plt.tight_layout()
-plt.savefig('masks_preview.png')
+# #check what the masks look like
+# fig, axes = plt.subplots(2, len(cameras_data), figsize=(20, 8))
+# for i, cam_data in enumerate(cameras_data):
+#     axes[0, i].imshow(cam_data['target_image'])
+#     axes[0, i].set_title(f"Image {i}")
+#     axes[1, i].imshow(cam_data['mask'], cmap='gray')
+#     axes[1, i].set_title(f"Mask {i}")
+# for ax in axes.flat:
+#     ax.axis('off')
+# plt.tight_layout()
+# plt.savefig('masks_preview.png')
 
 # # # Run the test
 # test_initial_render(gaussians, cameras_data)
 # model = GaussianModel(gaussians)
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-preview_pytorch_render(gaussians, cameras_data, cam_index=0, device=device)
+# preview_pytorch_render(gaussians, cameras_data, cam_index=0, device=device)
 
-model, losses = train(gaussians, cameras_data,  n_epochs=45, device=device)
-
-# # plot loss curve
-plt.figure()
-plt.plot(losses)
-plt.xlabel("Epoch")
-plt.ylabel("L1 Loss")
-plt.title("Training Loss")
-plt.savefig("loss_curve.png")
-plt.close()
-
-
+model = GaussianModel(gaussians).to(device) # no training run
 # run it
 scene_center, radius = get_scene_center_and_radius(cameras_data)
 print(f"Scene center: {scene_center}")
@@ -267,7 +256,7 @@ video_cameras = create_circular_cameras(
     scene_center=scene_center,
     radius=radius,
     n_frames=60,
-    ref_camera=cameras_data[0]['camera'],
+    ref_camera=cameras_data[1]['camera'],
     image_width=800,
     image_height=600
 )
@@ -275,90 +264,90 @@ video_cameras = create_circular_cameras(
 render_video(model, video_cameras, device=device, output_path='gaussian_splat.mp4')
 
 # render final result
-with torch.no_grad():
-    final = render_gaussians_torch(model, cameras_data[0]['camera'], device=device)
-    final_np = final.cpu().numpy()
-    target = cameras_data[0]['target_image']
+# with torch.no_grad():
+#     final = render_gaussians_torch(model, cameras_data[0]['camera'], device=device)
+#     final_np = final.cpu().numpy()
+#     target = cameras_data[0]['target_image']
     
-    plt.figure()
-    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-    axes[0].imshow(np.clip(target, 0, 1))
-    axes[0].set_title("Target")
-    axes[1].imshow(np.clip(final_np, 0, 1))
-    axes[1].set_title("Final Render")
-    axes[2].imshow(np.clip(np.abs(target - final_np), 0, 1))
-    axes[2].set_title("Difference")
-    for ax in axes: ax.axis('off')
-    plt.tight_layout()
-    plt.savefig("final_render0.png")
-    plt.close()
+#     plt.figure()
+#     fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+#     axes[0].imshow(np.clip(target, 0, 1))
+#     axes[0].set_title("Target")
+#     axes[1].imshow(np.clip(final_np, 0, 1))
+#     axes[1].set_title("Final Render")
+#     axes[2].imshow(np.clip(np.abs(target - final_np), 0, 1))
+#     axes[2].set_title("Difference")
+#     for ax in axes: ax.axis('off')
+#     plt.tight_layout()
+#     plt.savefig("final_render0.png")
+#     plt.close()
 
     
-    final = render_gaussians_torch(model, cameras_data[1]['camera'], device=device)
-    final_np = final.cpu().numpy()
-    target = cameras_data[1]['target_image']
+#     final = render_gaussians_torch(model, cameras_data[1]['camera'], device=device)
+#     final_np = final.cpu().numpy()
+#     target = cameras_data[1]['target_image']
     
-    plt.figure()
-    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-    axes[0].imshow(np.clip(target, 0, 1))
-    axes[0].set_title("Target")
-    axes[1].imshow(np.clip(final_np, 0, 1))
-    axes[1].set_title("Final Render")
-    axes[2].imshow(np.clip(np.abs(target - final_np), 0, 1))
-    axes[2].set_title("Difference")
-    for ax in axes: ax.axis('off')
-    plt.tight_layout()
-    plt.savefig("final_render1.png")
-    plt.close()
+#     plt.figure()
+#     fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+#     axes[0].imshow(np.clip(target, 0, 1))
+#     axes[0].set_title("Target")
+#     axes[1].imshow(np.clip(final_np, 0, 1))
+#     axes[1].set_title("Final Render")
+#     axes[2].imshow(np.clip(np.abs(target - final_np), 0, 1))
+#     axes[2].set_title("Difference")
+#     for ax in axes: ax.axis('off')
+#     plt.tight_layout()
+#     plt.savefig("final_render1.png")
+#     plt.close()
 
-    final = render_gaussians_torch(model, cameras_data[2]['camera'], device=device)
-    final_np = final.cpu().numpy()
-    target = cameras_data[2]['target_image']
+#     final = render_gaussians_torch(model, cameras_data[2]['camera'], device=device)
+#     final_np = final.cpu().numpy()
+#     target = cameras_data[2]['target_image']
     
-    plt.figure()
-    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-    axes[0].imshow(np.clip(target, 0, 1))
-    axes[0].set_title("Target")
-    axes[1].imshow(np.clip(final_np, 0, 1))
-    axes[1].set_title("Final Render")
-    axes[2].imshow(np.clip(np.abs(target - final_np), 0, 1))
-    axes[2].set_title("Difference")
-    for ax in axes: ax.axis('off')
-    plt.tight_layout()
-    plt.savefig("final_render2.png")
-    plt.close()
+#     plt.figure()
+#     fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+#     axes[0].imshow(np.clip(target, 0, 1))
+#     axes[0].set_title("Target")
+#     axes[1].imshow(np.clip(final_np, 0, 1))
+#     axes[1].set_title("Final Render")
+#     axes[2].imshow(np.clip(np.abs(target - final_np), 0, 1))
+#     axes[2].set_title("Difference")
+#     for ax in axes: ax.axis('off')
+#     plt.tight_layout()
+#     plt.savefig("final_render2.png")
+#     plt.close()
 
-    final = render_gaussians_torch(model, cameras_data[3]['camera'], device=device)
-    final_np = final.cpu().numpy()
-    target = cameras_data[3]['target_image']
+#     final = render_gaussians_torch(model, cameras_data[3]['camera'], device=device)
+#     final_np = final.cpu().numpy()
+#     target = cameras_data[3]['target_image']
     
-    plt.figure()
-    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-    axes[0].imshow(np.clip(target, 0, 1))
-    axes[0].set_title("Target")
-    axes[1].imshow(np.clip(final_np, 0, 1))
-    axes[1].set_title("Final Render")
-    axes[2].imshow(np.clip(np.abs(target - final_np), 0, 1))
-    axes[2].set_title("Difference")
-    for ax in axes: ax.axis('off')
-    plt.tight_layout()
-    plt.savefig("final_render3.png")
-    plt.close()
+#     plt.figure()
+#     fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+#     axes[0].imshow(np.clip(target, 0, 1))
+#     axes[0].set_title("Target")
+#     axes[1].imshow(np.clip(final_np, 0, 1))
+#     axes[1].set_title("Final Render")
+#     axes[2].imshow(np.clip(np.abs(target - final_np), 0, 1))
+#     axes[2].set_title("Difference")
+#     for ax in axes: ax.axis('off')
+#     plt.tight_layout()
+#     plt.savefig("final_render3.png")
+#     plt.close()
     
-    final = render_gaussians_torch(model, cameras_data[4]['camera'], device=device)
-    final_np = final.cpu().numpy()
-    target = cameras_data[4]['target_image']
+#     final = render_gaussians_torch(model, cameras_data[4]['camera'], device=device)
+#     final_np = final.cpu().numpy()
+#     target = cameras_data[4]['target_image']
     
-    plt.figure()
-    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-    axes[0].imshow(np.clip(target, 0, 1))
-    axes[0].set_title("Target")
-    axes[1].imshow(np.clip(final_np, 0, 1))
-    axes[1].set_title("Final Render")
-    axes[2].imshow(np.clip(np.abs(target - final_np), 0, 1))
-    axes[2].set_title("Difference")
-    for ax in axes: ax.axis('off')
-    plt.tight_layout()
-    plt.savefig("final_render4.png")
-    plt.close()
+#     plt.figure()
+#     fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+#     axes[0].imshow(np.clip(target, 0, 1))
+#     axes[0].set_title("Target")
+#     axes[1].imshow(np.clip(final_np, 0, 1))
+#     axes[1].set_title("Final Render")
+#     axes[2].imshow(np.clip(np.abs(target - final_np), 0, 1))
+#     axes[2].set_title("Difference")
+#     for ax in axes: ax.axis('off')
+#     plt.tight_layout()
+#     plt.savefig("final_render4.png")
+#     plt.close()
     
