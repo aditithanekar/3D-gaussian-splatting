@@ -12,6 +12,7 @@ import torch.nn as nn
 import torch.optim as optim
 from gaussianmodeltrain import GaussianModel, render_gaussians_torch, train
 from rembg import remove
+import imageio.v2 as imageio
 
 
 def test_initialization():
@@ -179,6 +180,50 @@ def preview_pytorch_render(gaussians_list, cameras_data, cam_index=0, device='cp
     plt.savefig("preview_render.png", dpi=150, bbox_inches='tight')
     plt.close()
     
+
+def get_scene_center_and_radius(cameras_data):
+    centers = np.array([np.array(cam_data['camera'].T) for cam_data in cameras_data])
+    scene_center = centers.mean(axis=0)
+    radius = np.linalg.norm(centers - scene_center, axis=1).mean()
+    return scene_center, radius
+
+def create_circular_cameras(scene_center, radius, n_frames=60,
+                            ref_camera=None, image_width=800, image_height=600):
+    cameras = []
+    for i in range(n_frames):
+        angle = 2 * np.pi * i / n_frames
+        cam_pos = np.array([
+            scene_center[0] + radius * np.cos(angle),
+            scene_center[1],
+            scene_center[2] + radius * np.sin(angle)
+        ])
+        forward = scene_center - cam_pos
+        forward = forward / (np.linalg.norm(forward) + 1e-8)
+        up = np.array([0, -1, 0])
+        right = np.cross(forward, up)
+        right = right / (np.linalg.norm(right) + 1e-8)
+        up = np.cross(right, forward)
+        up = up / (np.linalg.norm(up) + 1e-8)
+        R = np.stack([right, up, forward], axis=0)
+        cam = Camera(R=R, T=cam_pos,
+                     FoVx=ref_camera.FoVx, FoVy=ref_camera.FoVy,
+                     image_width=image_width, image_height=image_height)
+        cameras.append(cam)
+    return cameras
+
+def render_video(model, cameras, device='cuda', output_path='output.mp4', fps=24):
+    frames = []
+    print(f"Rendering {len(cameras)} frames...")
+    for i, cam in enumerate(cameras):
+        with torch.no_grad():
+            frame = render_gaussians_torch(model, cam, device=device)
+        frame_np = (frame.cpu().numpy() * 255).clip(0, 255).astype(np.uint8)
+        frames.append(frame_np)
+        if i % 10 == 0:
+            print(f"  Frame {i}/{len(cameras)}")
+    imageio.mimwrite(output_path, frames, fps=fps)
+    print(f"Saved to {output_path}")
+
 # # Test it:
 gaussians, recon = test_initialization()
 cameras_data = load_cameras_from_colmap(recon)
@@ -212,9 +257,26 @@ plt.title("Training Loss")
 plt.savefig("loss_curve.png")
 plt.close()
 
+
+# run it
+scene_center, radius = get_scene_center_and_radius(cameras_data)
+print(f"Scene center: {scene_center}")
+print(f"Radius: {radius:.2f}")
+
+video_cameras = create_circular_cameras(
+    scene_center=scene_center,
+    radius=radius,
+    n_frames=60,
+    ref_camera=cameras_data[0]['camera'],
+    image_width=800,
+    image_height=600
+)
+
+render_video(model, video_cameras, device=device, output_path='gaussian_splat.mp4')
+
 # render final result
 with torch.no_grad():
-    final = render_gaussians_torch(model, cameras_data[0]['camera'])
+    final = render_gaussians_torch(model, cameras_data[0]['camera'], device=device)
     final_np = final.cpu().numpy()
     target = cameras_data[0]['target_image']
     
@@ -232,7 +294,7 @@ with torch.no_grad():
     plt.close()
 
     
-    final = render_gaussians_torch(model, cameras_data[1]['camera'])
+    final = render_gaussians_torch(model, cameras_data[1]['camera'], device=device)
     final_np = final.cpu().numpy()
     target = cameras_data[1]['target_image']
     
@@ -249,7 +311,7 @@ with torch.no_grad():
     plt.savefig("final_render1.png")
     plt.close()
 
-    final = render_gaussians_torch(model, cameras_data[2]['camera'])
+    final = render_gaussians_torch(model, cameras_data[2]['camera'], device=device)
     final_np = final.cpu().numpy()
     target = cameras_data[2]['target_image']
     
@@ -266,7 +328,7 @@ with torch.no_grad():
     plt.savefig("final_render2.png")
     plt.close()
 
-    final = render_gaussians_torch(model, cameras_data[3]['camera'])
+    final = render_gaussians_torch(model, cameras_data[3]['camera'], device=device)
     final_np = final.cpu().numpy()
     target = cameras_data[3]['target_image']
     
@@ -283,7 +345,7 @@ with torch.no_grad():
     plt.savefig("final_render3.png")
     plt.close()
     
-    final = render_gaussians_torch(model, cameras_data[4]['camera'])
+    final = render_gaussians_torch(model, cameras_data[4]['camera'], device=device)
     final_np = final.cpu().numpy()
     target = cameras_data[4]['target_image']
     
@@ -299,3 +361,4 @@ with torch.no_grad():
     plt.tight_layout()
     plt.savefig("final_render4.png")
     plt.close()
+    
